@@ -1,16 +1,17 @@
 package main
 
 import (
-	"net"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/yangmls/vcron"
+	"net"
 )
 
-var ConnId int
-var Conns map[int]net.Conn
-var ConnNames map[int]string
-var ConnChans map[int]chan int
+var (
+	ConnId    int
+	Conns     map[int]net.Conn
+	ConnNames map[int]string
+	ConnChans map[int]chan int
+)
 
 func init() {
 	ConnId = 0

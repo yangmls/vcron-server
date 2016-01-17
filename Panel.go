@@ -1,8 +1,7 @@
 package main
 
 import (
-	"fmt"
-	"io"
+	"github.com/yangmls/vcron/rest"
 	"log"
 	"net/http"
 )
@@ -12,21 +11,21 @@ type Panel struct {
 }
 
 func (panel *Panel) Run() {
-	RegisterRoutes()
 
-	fmt.Println("Panel is running on " + panel.Port)
+	api := rest.NewApi()
 
-	err := http.ListenAndServe(":"+panel.Port, nil)
+	api.Use(rest.DefaultDevStack...)
 
+	router, err := rest.MakeRouter(JobsRoutes()...)
 	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		log.Fatal(err)
 	}
-}
 
-func RegisterRoutes() {
-	http.HandleFunc("/hello", HelloServer)
-}
+	api.SetApp(router)
 
-func HelloServer(w http.ResponseWriter, req *http.Request) {
-	io.WriteString(w, "hello, world!\n")
+	http.Handle("/api/", http.StripPrefix("/api", api.MakeHandler()))
+
+	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.Dir("."))))
+
+	log.Fatal(http.ListenAndServe(":"+panel.Port, nil))
 }

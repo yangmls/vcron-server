@@ -1,9 +1,5 @@
 package main
 
-import (
-	"github.com/yangmls/vcron"
-)
-
 func main() {
 	go StartPanel()
 	go StartCron()
@@ -22,17 +18,5 @@ func StartPanel() {
 }
 
 func StartCron() {
-	go func() {
-		name := "Clives-Air.local"
-		command := "date"
-		expression := "0 * * * * * *"
-
-		cron := *vcron.NewCron(expression)
-
-		for {
-			timer := cron.GetNextTimer()
-			<-timer.C
-			go DispatchCommandByName(name, command)
-		}
-	}()
+	StartJobs()
 }

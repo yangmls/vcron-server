@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
-	"net"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/yangmls/vcron"
+	"net"
 )
 
 type Server struct {
