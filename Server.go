@@ -35,9 +35,14 @@ func (server *Server) Run() {
 }
 
 func handleRequest(conn net.Conn) {
+	var (
+		message *vcron.Message
+		err     error
+	)
+
 	defer conn.Close()
 
-	message := read(conn)
+	message, err = read(conn)
 
 	if message == nil {
 		return
@@ -47,26 +52,24 @@ func handleRequest(conn net.Conn) {
 		return
 	}
 
-	AddConn(message.GetName(), conn)
+	id := AddConn(message.GetName(), conn)
 
 	for {
-		message := read(conn)
+		message, err = read(conn)
 
-		if message == nil {
-			conn.Close()
-			return
+		if err != nil {
+			RemoveCon(id)
+			break
 		}
-
-		fmt.Println(message)
 	}
 }
 
-func read(conn net.Conn) (m *vcron.Message) {
+func read(conn net.Conn) (*vcron.Message, error) {
 	data := make([]byte, 4096)
 	len, readErr := conn.Read(data)
 
 	if readErr != nil {
-		return
+		return nil, readErr
 	}
 
 	message := &vcron.Message{}
@@ -74,8 +77,8 @@ func read(conn net.Conn) (m *vcron.Message) {
 
 	if uncodeErr != nil {
 		fmt.Println(uncodeErr)
-		return
+		return nil, nil
 	}
 
-	return message
+	return message, nil
 }

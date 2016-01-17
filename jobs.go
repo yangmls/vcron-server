@@ -6,49 +6,54 @@ import (
 )
 
 var (
-	Jobs = make(map[string]*Job)
+	JobId = 0
+	Jobs  = make(map[int]*Job)
 )
 
 type Job struct {
+	Name       string
 	Expression string
 	Command    string
 	Timer      *time.Timer
 }
 
-func AddJob(name string, job *Job) {
-	Jobs[name] = job
-	go StartJob(name)
+func AddJob(job *Job) int {
+	JobId = JobId + 1
+	Jobs[JobId] = job
+	go StartJob(JobId)
+
+	return JobId
 }
 
-func RemoveJob(name string) {
-	StopJob(name)
-	delete(Jobs, name)
+func RemoveJob(id int) {
+	StopJob(id)
+	delete(Jobs, id)
 }
 
-func UpdateJob(name string, job *Job) {
-	StopJob(name)
-	Jobs[name] = job
-	go StartJob(name)
+func UpdateJob(id int, job *Job) {
+	StopJob(id)
+	Jobs[id] = job
+	go StartJob(id)
 }
 
 func StartJobs() {
-	for name, _ := range Jobs {
-		go StartJob(name)
+	for id, _ := range Jobs {
+		go StartJob(id)
 	}
 }
 
-func StartJob(name string) {
-	job := Jobs[name]
+func StartJob(id int) {
+	job := Jobs[id]
 	cron := *vcron.NewCron(job.Expression)
 
 	for {
 		job.Timer = cron.GetNextTimer()
 		<-job.Timer.C
-		go DispatchCommandByName(name, job.Command)
+		go DispatchCommandByName(job.Name, job.Command)
 	}
 }
 
-func StopJob(name string) {
-	job := Jobs[name]
+func StopJob(id int) {
+	job := Jobs[id]
 	job.Timer.Stop()
 }
