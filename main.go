@@ -22,19 +22,17 @@ func StartPanel() {
 }
 
 func StartCron() {
-	cron := *vcron.NewCron()
-
 	go func() {
 		name := "Clives-Air.local"
-		command := "echo 1"
+		command := "date"
+		expression := "0 * * * * * *"
 
-		cron.Add(name, "* * * * *", command)
+		cron := *vcron.NewCron(expression)
 
 		for {
-			command := <-cron.Listeners[name]
+			timer := cron.GetNextTimer()
+			<-timer.C
 			go DispatchCommandByName(name, command)
 		}
 	}()
-
-	cron.Run()
 }
