@@ -1,7 +1,11 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/yangmls/vcron"
+	"io/ioutil"
+	"os/user"
 	"time"
 )
 
@@ -17,23 +21,40 @@ type Job struct {
 	Timer      *time.Timer
 }
 
-func AddJob(job *Job) int {
+type JobStore struct {
+	Name       string
+	Expression string
+	Command    string
+}
+
+func AddJob(n string, e string, c string) int {
+	job := &Job{
+		Name:       n,
+		Expression: e,
+		Command:    c,
+	}
+
 	JobId = JobId + 1
 	Jobs[JobId] = job
 	go StartJob(JobId)
-
+	go StoreJobs()
 	return JobId
 }
 
 func RemoveJob(id int) {
 	StopJob(id)
 	delete(Jobs, id)
+	go StoreJobs()
 }
 
-func UpdateJob(id int, job *Job) {
+func UpdateJob(id int, n string, e string, c string) {
 	StopJob(id)
-	Jobs[id] = job
+	job := Jobs[id]
+	job.Name = n
+	job.Expression = e
+	job.Command = c
 	go StartJob(id)
+	go StoreJobs()
 }
 
 func StartJobs() {
@@ -56,4 +77,55 @@ func StartJob(id int) {
 func StopJob(id int) {
 	job := Jobs[id]
 	job.Timer.Stop()
+}
+
+func JobsPath() string {
+	var (
+		current *user.User
+		err     error
+	)
+
+	current, err = user.Current()
+
+	if err != nil {
+		fmt.Println("can not get home dir")
+	}
+
+	dir := current.HomeDir
+	return dir + "/vcron.json"
+}
+
+func LoadJobs() {
+	path := JobsPath()
+	b, err := ioutil.ReadFile(path)
+
+	if err != nil {
+		return
+	}
+
+	var data []*JobStore
+	json.Unmarshal(b, &data)
+
+	for _, row := range data {
+		AddJob(row.Name, row.Expression, row.Command)
+	}
+}
+
+func StoreJobs() {
+	path := JobsPath()
+
+	data := make([]*JobStore, len(Jobs))
+
+	i := 0
+	for _, job := range Jobs {
+		data[i] = &JobStore{
+			Name:       job.Name,
+			Expression: job.Expression,
+			Command:    job.Command,
+		}
+		i++
+	}
+
+	b, _ := json.Marshal(&data)
+	ioutil.WriteFile(path, b, 0644)
 }

@@ -40,13 +40,13 @@ func getJobs(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func postJobs(w rest.ResponseWriter, r *rest.Request) {
-	model, job := payload(w, r)
+	model := payload(w, r)
 
-	if job == nil {
+	if model == nil {
 		return
 	}
 
-	id := AddJob(job)
+	id := AddJob(model.Name, model.Expression, model.Command)
 	model.Id = id
 	w.WriteJson(model)
 }
@@ -58,13 +58,13 @@ func putJobs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	model, job := payload(w, r)
+	model := payload(w, r)
 
-	if job == nil {
+	if model == nil {
 		return
 	}
 
-	UpdateJob(id, job)
+	UpdateJob(id, model.Name, model.Expression, model.Command)
 	model.Id = id
 	w.WriteJson(model)
 }
@@ -79,32 +79,27 @@ func deleteJobs(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func payload(w rest.ResponseWriter, r *rest.Request) (*JobModel, *Job) {
+func payload(w rest.ResponseWriter, r *rest.Request) *JobModel {
 	model := &JobModel{}
 	err := r.DecodeJsonPayload(model)
 
 	if err != nil {
 		rest.Error(w, err.Error(), http.StatusInternalServerError)
-		return nil, nil
+		return nil
 	}
 
 	if model.Name == "" {
 		rest.Error(w, "job name required", 400)
-		return nil, nil
+		return nil
 	}
 	if model.Command == "" {
 		rest.Error(w, "job command required", 400)
-		return nil, nil
+		return nil
 	}
 	if model.Expression == "" {
 		rest.Error(w, "job expression required", 400)
-		return nil, nil
-	}
-	job := &Job{
-		Name:       model.Name,
-		Expression: model.Expression,
-		Command:    model.Command,
+		return nil
 	}
 
-	return model, job
+	return model
 }
