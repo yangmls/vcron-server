@@ -57,12 +57,6 @@ func UpdateJob(id int, n string, e string, c string) {
 	go StoreJobs()
 }
 
-func StartJobs() {
-	for id, _ := range Jobs {
-		go StartJob(id)
-	}
-}
-
 func StartJob(id int) {
 	job := Jobs[id]
 	cron := *vcron.NewCron(job.Expression)
@@ -107,7 +101,15 @@ func LoadJobs() {
 	json.Unmarshal(b, &data)
 
 	for _, row := range data {
-		AddJob(row.Name, row.Expression, row.Command)
+		job := &Job{
+			Name:       row.Name,
+			Expression: row.Expression,
+			Command:    row.Command,
+		}
+
+		JobId = JobId + 1
+		Jobs[JobId] = job
+		go StartJob(JobId)
 	}
 }
 

@@ -2,8 +2,6 @@ package main
 
 func main() {
 
-	LoadJobs()
-
 	go StartPanel()
 	go StartCron()
 
@@ -21,5 +19,5 @@ func StartPanel() {
 }
 
 func StartCron() {
-	StartJobs()
+	LoadJobs()
 }

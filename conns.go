@@ -5,6 +5,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/yangmls/vcron"
 	"net"
+	"sync"
 )
 
 var (
@@ -13,17 +14,19 @@ var (
 )
 
 type Conn struct {
-	Id   int
-	Name string
-	I    net.Conn
+	Id    int
+	Name  string
+	I     net.Conn
+	Mutex *sync.Mutex
 }
 
 func AddConn(name string, conn net.Conn) int {
 	ConnId = ConnId + 1
 	c := &Conn{
-		Id:   ConnId,
-		Name: name,
-		I:    conn,
+		Id:    ConnId,
+		Name:  name,
+		I:     conn,
+		Mutex: new(sync.Mutex),
 	}
 	Conns[ConnId] = c
 
@@ -44,17 +47,19 @@ func DispatchCommandByName(name string, command string) {
 
 	for _, value := range Conns {
 		if name == value.Name {
-			go DispatchCommand(value.I, command)
+			go DispatchCommand(value, command)
 		}
 	}
 
 }
 
-func DispatchCommand(conn net.Conn, command string) {
+func DispatchCommand(conn *Conn, command string) {
+	conn.Mutex.Lock()
 	message := &vcron.Message{
 		Type:    proto.String("run"),
 		Command: proto.String(command),
 	}
 	data, _ := proto.Marshal(message)
-	conn.Write(data)
+	conn.I.Write(data)
+	conn.Mutex.Unlock()
 }
