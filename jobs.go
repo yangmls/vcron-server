@@ -3,10 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yangmls/vcron"
 	"io/ioutil"
 	"os/user"
-	"time"
 )
 
 var (
@@ -15,13 +13,6 @@ var (
 )
 
 type Job struct {
-	Name       string
-	Expression string
-	Command    string
-	Timer      *time.Timer
-}
-
-type JobStore struct {
 	Name       string
 	Expression string
 	Command    string
@@ -36,41 +27,21 @@ func AddJob(n string, e string, c string) int {
 
 	JobId = JobId + 1
 	Jobs[JobId] = job
-	go StartJob(JobId)
 	go StoreJobs()
 	return JobId
 }
 
 func RemoveJob(id int) {
-	StopJob(id)
 	delete(Jobs, id)
 	go StoreJobs()
 }
 
 func UpdateJob(id int, n string, e string, c string) {
-	StopJob(id)
 	job := Jobs[id]
 	job.Name = n
 	job.Expression = e
 	job.Command = c
-	go StartJob(id)
 	go StoreJobs()
-}
-
-func StartJob(id int) {
-	job := Jobs[id]
-	cron := *vcron.NewCron(job.Expression)
-
-	for {
-		job.Timer = cron.GetNextTimer()
-		<-job.Timer.C
-		go DispatchCommandByName(job.Name, job.Command)
-	}
-}
-
-func StopJob(id int) {
-	job := Jobs[id]
-	job.Timer.Stop()
 }
 
 func JobsPath() string {
@@ -97,7 +68,7 @@ func LoadJobs() {
 		return
 	}
 
-	var data []*JobStore
+	var data []*Job
 	json.Unmarshal(b, &data)
 
 	for _, row := range data {
@@ -109,22 +80,17 @@ func LoadJobs() {
 
 		JobId = JobId + 1
 		Jobs[JobId] = job
-		go StartJob(JobId)
 	}
 }
 
 func StoreJobs() {
 	path := JobsPath()
 
-	data := make([]*JobStore, len(Jobs))
+	data := make([]*Job, len(Jobs))
 
 	i := 0
 	for _, job := range Jobs {
-		data[i] = &JobStore{
-			Name:       job.Name,
-			Expression: job.Expression,
-			Command:    job.Command,
-		}
+		data[i] = job
 		i++
 	}
 

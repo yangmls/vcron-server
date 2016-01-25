@@ -1,11 +1,13 @@
 package main
 
-func main() {
+var exit = make(chan bool)
 
+func main() {
 	go StartPanel()
 	go StartCron()
+	go StartServer()
 
-	StartServer()
+	<-exit
 }
 
 func StartServer() {

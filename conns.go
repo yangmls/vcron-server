@@ -4,62 +4,81 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/yangmls/vcron"
+	"io/ioutil"
 	"net"
 	"sync"
+	"time"
 )
 
 var (
-	ConnId = 0
-	Conns  = make(map[int]*Conn)
+	ConnID    = 0
+	ConnMutex = new(sync.Mutex)
+	Conns     = make(map[int]*Conn)
 )
 
 type Conn struct {
-	Id    int
 	Name  string
-	I     net.Conn
-	Mutex *sync.Mutex
+	Timer *time.Timer
+	C     net.Conn
 }
 
-func AddConn(name string, conn net.Conn) int {
-	ConnId = ConnId + 1
-	c := &Conn{
-		Id:    ConnId,
-		Name:  name,
-		I:     conn,
-		Mutex: new(sync.Mutex),
-	}
-	Conns[ConnId] = c
-
-	fmt.Println("Add conn", ConnId)
-
-	return ConnId
+func (conn *Conn) Run() {
 }
 
-func RemoveCon(id int) {
-	conn := Conns[id]
-	conn.I.Close()
-	delete(Conns, id)
+func (conn *Conn) Remove() {
 
-	fmt.Println("Remove conn", id)
 }
 
-func DispatchCommandByName(name string, command string) {
+func (conn *Conn) GetOrder() {
 
-	for _, value := range Conns {
-		if name == value.Name {
-			go DispatchCommand(value, command)
-		}
+}
+
+func (conn *Conn) IsFirst() {
+
+}
+
+func (conn *Conn) SendRequest(request *vcron.Request) {
+	fmt.Println("sending request")
+	data, _ := proto.Marshal(request)
+	conn.C.Write(data)
+	fmt.Println("sent request")
+}
+
+func (conn *Conn) WaitResponse() (*vcron.Response, error) {
+	data, err := ioutil.ReadAll(conn.C)
+
+	if err != nil {
+		return nil, err
 	}
 
+	response := &vcron.Response{}
+
+	err = proto.Unmarshal(data, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
-func DispatchCommand(conn *Conn, command string) {
-	conn.Mutex.Lock()
-	message := &vcron.Message{
-		Type:    proto.String("run"),
-		Command: proto.String(command),
+func AddConn(c net.Conn) {
+	ConnMutex.Lock()
+	ConnID++
+	conn := &Conn{
+		C: c,
 	}
-	data, _ := proto.Marshal(message)
-	conn.I.Write(data)
-	conn.Mutex.Unlock()
+	Conns[ConnID] = conn
+	ConnMutex.Unlock()
+
+	request := &vcron.Request{
+		Type: "register",
+	}
+
+	conn.SendRequest(request)
+	conn.WaitResponse()
+
+	fmt.Println("running ", ConnID)
+
+	go conn.Run()
 }
