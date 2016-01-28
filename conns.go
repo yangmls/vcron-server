@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/yangmls/vcron"
@@ -17,13 +18,19 @@ var (
 )
 
 type Conn struct {
-	Name  string
-	Timer *time.Timer
-	C     net.Conn
-	Mutex *sync.Mutex
+	ID      int
+	Name    string
+	Timer   *time.Timer
+	C       net.Conn
+	Mutex   *sync.Mutex
+	Running bool
 }
 
 func (conn *Conn) Run() {
+	fmt.Println("running ", conn.ID)
+
+	conn.Running = true
+
 	for {
 		now := time.Now()
 		jobs := make([]*vcron.Job, 0)
@@ -56,14 +63,29 @@ func (conn *Conn) Run() {
 		}
 
 		conn.Timer = time.NewTimer(d)
-		<-conn.Timer.C
+		msg := <-conn.Timer.C
+
+		if !conn.Running {
+			return
+		}
+
+		fmt.Println(msg)
 
 		go conn.RunJobs(jobs)
 	}
 }
 
-func (conn *Conn) Remove() {
+func (conn *Conn) Stop() {
+	conn.Running = false
+	conn.Timer.Stop()
+}
 
+func (conn *Conn) Remove() {
+	fmt.Println("removing conn", conn.ID)
+
+	conn.Stop()
+	conn.C.Close()
+	delete(Conns, conn.ID)
 }
 
 func (conn *Conn) GetOrder() {
@@ -82,17 +104,49 @@ func (conn *Conn) RunJobs(jobs []*vcron.Job) {
 		Jobs: jobs,
 	}
 
-	conn.SendRequest(request)
-	conn.WaitResponse()
+	err := conn.SendRequest(request)
+
+	if err == nil {
+		_, err := conn.WaitResponse()
+
+		if err != nil {
+			conn.Remove()
+		}
+	} else {
+		conn.Remove()
+	}
 
 	conn.Mutex.Unlock()
 }
 
-func (conn *Conn) SendRequest(request *vcron.Request) {
+func (conn *Conn) SendRequest(request *vcron.Request) error {
+	var (
+		data []byte
+		err  error
+	)
+
 	fmt.Println("sending request")
-	data, _ := proto.Marshal(request)
-	conn.C.Write(data)
+
+	data, err = proto.Marshal(request)
+	prefix := make([]byte, 4, 4)
+	size := uint64(len(data))
+	binary.PutUvarint(prefix, size)
+
+	_, err = conn.C.Write(prefix)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.C.Write(data)
+
+	if err != nil {
+		return err
+	}
+
 	fmt.Println("sent request")
+
+	return nil
 }
 
 func (conn *Conn) WaitResponse() (*vcron.Response, error) {
@@ -120,6 +174,7 @@ func AddConn(c net.Conn) {
 	ConnMutex.Lock()
 	ConnID++
 	conn := &Conn{
+		ID:    ConnID,
 		C:     c,
 		Mutex: new(sync.Mutex),
 	}
@@ -138,8 +193,6 @@ func AddConn(c net.Conn) {
 	}
 
 	conn.Name = response.Message
-
-	fmt.Println("running ", ConnID)
 
 	go conn.Run()
 }
